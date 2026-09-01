@@ -9,10 +9,10 @@ from __future__ import annotations
 import pandas as pd
 
 METRICAS = [
-    {"chave": "mensagens", "rotulo": "Mensagens enviadas", "requer_midia": False, "icone": "chat"},
-    {"chave": "caracteres", "rotulo": "Caracteres enviados", "requer_midia": False, "icone": "texto"},
-    {"chave": "audio", "rotulo": "Áudios enviados", "requer_midia": True, "icone": "microfone"},
-    {"chave": "figurinha", "rotulo": "Figurinhas enviadas", "requer_midia": True, "icone": "figurinha"},
+    {"chave": "mensagens", "plural": "mensagens", "rotulo": "mensagens enviadas", "requer_midia": False, "icone": "chat"},
+    {"chave": "caracteres", "plural": "caracteres", "rotulo": "caracteres enviados", "requer_midia": False, "icone": "texto"},
+    {"chave": "audio", "plural": "áudios", "rotulo": "áudios enviados", "requer_midia": True, "icone": "microfone"},
+    {"chave": "figurinha", "plural": "figurinhas", "rotulo": "figurinhas enviadas", "requer_midia": True, "icone": "figurinha"},
 ]
 
 

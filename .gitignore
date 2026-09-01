@@ -11,5 +11,7 @@ venv/
 out_test.zip
 out_test.pdf
 preview/
+relatorio_exemplo.pdf
+graficos_exemplo.zip
 
 .DS_Store

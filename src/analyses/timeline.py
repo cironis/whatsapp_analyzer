@@ -64,8 +64,7 @@ def run(ctx) -> AnalysisResult:
     ]
 
     insights = [
-        f"Recorte de {data_inicial.strftime('%d/%m/%Y')} a {data_final.strftime('%d/%m/%Y')} "
-        "(últimos 30 dias com mensagens no histórico enviado).",
+        f"Período: {data_inicial.strftime('%d/%m/%Y')} a {data_final.strftime('%d/%m/%Y')}.",
     ]
 
     return AnalysisResult(
@@ -75,5 +74,5 @@ def run(ctx) -> AnalysisResult:
         tables={"mensagens_30_dias": mensagens, "caracteres_30_dias": caracteres},
         charts=charts,
         insights=insights,
-        intro="Como a conversa se comportou no último mês do histórico enviado.",
+        intro="Mensagens e caracteres por dia, pessoa a pessoa, no último mês do histórico.",
     )

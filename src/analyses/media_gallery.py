@@ -1,5 +1,8 @@
 """Análises que só existem quando o .zip inclui os arquivos de mídia:
-galeria das imagens mais enviadas e duração dos áudios.
+duração dos áudios e as figurinhas mais repetidas por pessoa.
+
+Figurinhas costumam se repetir (o mesmo pacote é reaproveitado); fotos
+quase nunca se repetem, então o ranking usa figurinhas, não fotos.
 """
 
 from __future__ import annotations
@@ -25,11 +28,11 @@ except ImportError:  # pragma: no cover - mutagen está no requirements.txt
     MutagenFile = None
 
 KEY = "midia_detalhada"
-TITLE = "Galeria e áudios"
-ICON = "imagem"
+TITLE = "Figurinhas e áudios"
+ICON = "figurinha"
 REQUIRES_MEDIA = True
 
-QUANTIDADE_TOP_IMAGENS = 5
+QUANTIDADE_TOP_FIGURINHAS = 5
 
 
 def _duracao_audio(caminho: Path):
@@ -70,19 +73,19 @@ def _medir_duracoes_audio(df: pd.DataFrame, media_store) -> pd.DataFrame:
     return audios
 
 
-def _top_imagens_por_pessoa(df: pd.DataFrame, media_store, limite: int):
-    imagens = df.loc[df["tipo_midia"] == "imagem", ["nome", "nome_arquivo_anexo"]].dropna()
+def _top_figurinhas_por_pessoa(df: pd.DataFrame, media_store, limite: int):
+    figurinhas = df.loc[df["tipo_midia"] == "figurinha", ["nome", "nome_arquivo_anexo"]].dropna()
 
-    if imagens.empty:
+    if figurinhas.empty:
         return pd.DataFrame(columns=["nome", "posicao", "arquivo", "quantidade_envios"]), {}
 
-    imagens = imagens.loc[imagens["nome_arquivo_anexo"].apply(media_store.contains)]
+    figurinhas = figurinhas.loc[figurinhas["nome_arquivo_anexo"].apply(media_store.contains)]
 
-    if imagens.empty:
+    if figurinhas.empty:
         return pd.DataFrame(columns=["nome", "posicao", "arquivo", "quantidade_envios"]), {}
 
     contagem = (
-        imagens.groupby(["nome", "nome_arquivo_anexo"], observed=True)
+        figurinhas.groupby(["nome", "nome_arquivo_anexo"], observed=True)
         .size()
         .reset_index(name="quantidade_envios")
         .sort_values(["nome", "quantidade_envios"], ascending=[True, False])
@@ -106,13 +109,13 @@ def _grafico_galeria(tabela: pd.DataFrame, miniaturas: dict, limite: int):
     if not pessoas:
         fig, ax = plt.subplots(figsize=(9, 3))
         ax.axis("off")
-        ax.text(0.5, 0.5, "Nenhuma imagem encontrada no .zip.", ha="center", va="center")
+        ax.text(0.5, 0.5, "Nenhuma figurinha repetida encontrada no .zip.", ha="center", va="center")
         return fig
 
     fig, eixos = plt.subplots(
         nrows=len(pessoas), ncols=limite, figsize=(3.4 * limite, 3.5 * len(pessoas)), squeeze=False,
     )
-    fig.suptitle("Top imagens mais enviadas por pessoa", fontsize=18, fontweight="bold", y=0.995)
+    fig.suptitle("Figurinhas mais repetidas por pessoa", fontsize=18, fontweight="bold", y=0.995)
 
     for linha, nome in enumerate(pessoas):
         grupo = tabela.loc[tabela["nome"] == nome].sort_values("posicao").reset_index(drop=True)
@@ -138,7 +141,7 @@ def _grafico_galeria(tabela: pd.DataFrame, miniaturas: dict, limite: int):
             except Exception:
                 eixo.text(0.5, 0.5, "Indisponível", ha="center", va="center", transform=eixo.transAxes)
 
-            eixo.set_title(f"{int(registro['posicao'])}º · {int(registro['quantidade_envios'])} envios", fontsize=10.5, fontweight="bold")
+            eixo.set_title(f"{int(registro['posicao'])}º · {int(registro['quantidade_envios'])}x", fontsize=10.5, fontweight="bold")
 
         eixos[linha, 0].text(
             -0.25, 0.5, textwrap.fill(str(nome), width=16), transform=eixos[linha, 0].transAxes,
@@ -191,21 +194,21 @@ def run(ctx) -> AnalysisResult:
 
         campeao_audio = resumo_audio.iloc[0]
         insights.append(
-            f"{campeao_audio['nome']} é quem mais manda áudio em tempo total: "
+            f"{campeao_audio['nome']} tem mais tempo de áudio: "
             f"{campeao_audio['tempo_total_formatado']} ({formatar_numero(campeao_audio['quantidade_audios'])} áudios)."
         )
 
-    top_imagens, miniaturas = _top_imagens_por_pessoa(ctx.df, ctx.media_store, QUANTIDADE_TOP_IMAGENS)
+    top_figurinhas, miniaturas = _top_figurinhas_por_pessoa(ctx.df, ctx.media_store, QUANTIDADE_TOP_FIGURINHAS)
 
-    if not top_imagens.empty:
+    if not top_figurinhas.empty:
         charts.append(
             ChartArtifact(
-                slug="15_top_imagens_por_pessoa",
-                title="Top imagens mais enviadas por pessoa",
-                figure=_grafico_galeria(top_imagens, miniaturas, QUANTIDADE_TOP_IMAGENS),
+                slug="15_top_figurinhas_por_pessoa",
+                title="Figurinhas mais repetidas por pessoa",
+                figure=_grafico_galeria(top_figurinhas, miniaturas, QUANTIDADE_TOP_FIGURINHAS),
             )
         )
-        tabelas["top_imagens_por_pessoa"] = top_imagens
+        tabelas["top_figurinhas_por_pessoa"] = top_figurinhas
 
     if not charts:
         return AnalysisResult(key=KEY, title=TITLE, icon=ICON)
@@ -217,5 +220,5 @@ def run(ctx) -> AnalysisResult:
         tables=tabelas,
         charts=charts,
         insights=insights,
-        intro="Só é possível com o .zip completo (com mídia): duração real dos áudios e as imagens repetidas mais enviadas.",
+        intro="Duração dos áudios e as figurinhas que mais se repetem, pessoa a pessoa.",
     )

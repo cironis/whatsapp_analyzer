@@ -95,8 +95,7 @@ def run(ctx) -> AnalysisResult:
     tabelas = {"midias_por_pessoa": total_por_pessoa}
     lider = total_por_pessoa.iloc[0]
     insights = [
-        f"{lider['nome']} é quem mais envia mídia no geral: "
-        f"{formatar_numero(lider['quantidade_midias'])} arquivos.",
+        f"{lider['nome']} enviou mais mídia no total: {formatar_numero(lider['quantidade_midias'])} arquivos.",
     ]
 
     if ctx.has_media:
@@ -121,14 +120,12 @@ def run(ctx) -> AnalysisResult:
         if "figurinha" in pivot.columns:
             campea_figurinha = pivot["figurinha"].idxmax()
             insights.append(
-                f"{campea_figurinha} lidera no envio de figurinhas "
-                f"({formatar_numero(pivot['figurinha'].max())})."
+                f"{campea_figurinha} enviou mais figurinhas: {formatar_numero(pivot['figurinha'].max())}."
             )
         if "audio" in pivot.columns:
             campea_audio = pivot["audio"].idxmax()
             insights.append(
-                f"{campea_audio} lidera no envio de áudios "
-                f"({formatar_numero(pivot['audio'].max())})."
+                f"{campea_audio} enviou mais áudios: {formatar_numero(pivot['audio'].max())}."
             )
 
     return AnalysisResult(

@@ -69,13 +69,10 @@ def run(ctx) -> AnalysisResult:
     quem_mais_sequencia = sequencias.iloc[0]
 
     insights = [
-        f"{quem_inicia['nome']} é quem mais costuma puxar uma nova conversa "
-        f"({formatar_numero(quem_inicia['conversas_iniciadas'])} vezes).",
-        f"{quem_finaliza['nome']} costuma ser quem fala por último "
-        f"({formatar_numero(quem_finaliza['conversas_finalizadas'])} vezes).",
-        f"O grupo já ficou {formatar_numero(sequencia_grupo)} dias seguidos "
-        f"com pelo menos uma mensagem — recorde individual de "
-        f"{quem_mais_sequencia['nome']}: {formatar_numero(quem_mais_sequencia['maximo_dias_consecutivos'])} dias.",
+        f"{quem_inicia['nome']} iniciou mais conversas: {formatar_numero(quem_inicia['conversas_iniciadas'])} vezes.",
+        f"{quem_finaliza['nome']} falou por último mais vezes: {formatar_numero(quem_finaliza['conversas_finalizadas'])}.",
+        f"Sequência mais longa do grupo: {formatar_numero(sequencia_grupo)} dias seguidos com mensagem. "
+        f"Recorde individual: {quem_mais_sequencia['nome']}, com {formatar_numero(quem_mais_sequencia['maximo_dias_consecutivos'])} dias.",
     ]
 
     return AnalysisResult(
@@ -89,6 +86,6 @@ def run(ctx) -> AnalysisResult:
         },
         charts=charts,
         insights=insights,
-        intro="Uma conversa nova começa quando passam mais de 2h de silêncio. "
-        "Aqui vemos quem inicia, quem encerra e quem mantém a chama acesa por mais dias seguidos.",
+        intro="Uma conversa nova começa após 2h de silêncio. Quem inicia, quem encerra "
+        "e a maior sequência de dias seguidos com mensagem.",
     )

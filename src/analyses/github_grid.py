@@ -1,5 +1,6 @@
-"""Grids estilo "contribuições do GitHub", um por métrica, coloridos por
-quem venceu cada dia (mensagens, caracteres, áudios, figurinhas)."""
+"""Calendário de atividade: um grid por métrica (mensagens, caracteres,
+áudios, figurinhas), com cada dia colorido pela pessoa que mais teve
+aquela métrica naquele dia."""
 
 from __future__ import annotations
 
@@ -13,8 +14,8 @@ from ..models import AnalysisResult, ChartArtifact
 from ..style import rodape_assinatura
 from ._daywinner import METRICAS, vencedores_por_dia
 
-KEY = "grids_github"
-TITLE = "Grid de atividade (estilo GitHub)"
+KEY = "calendario_atividade"
+TITLE = "Calendário de atividade"
 ICON = "grade"
 REQUIRES_MEDIA = False
 
@@ -116,20 +117,16 @@ def run(ctx) -> AnalysisResult:
         slug = _NUMERACAO_SLUG[metrica["chave"]]
         charts.append(
             ChartArtifact(
-                slug=f"{slug}_grid_{metrica['chave']}",
-                title=f"Grid de {metrica['rotulo'].lower()}",
+                slug=f"{slug}_calendario_{metrica['chave']}",
+                title=f"Calendário de {metrica['plural']}",
                 figure=_grafico_grid(
                     vencedores, ctx.color_map, ctx.people,
-                    f"Quem venceu cada dia — {metrica['rotulo'].lower()}",
+                    f"Quem teve mais {metrica['plural']} em cada dia",
                 ),
-                caption="Cada célula é um dia; a cor é de quem mais teve essa métrica naquele dia.",
             )
         )
         tabelas[f"vencedores_por_dia_{metrica['chave']}"] = vencedores.rename("vencedor").reset_index().rename(
             columns={"index": "data_calendario"}
-        )
-        insights.append(
-            f"O grid de {metrica['rotulo'].lower()} mostra, dia a dia, quem liderou essa métrica."
         )
 
     return AnalysisResult(
@@ -139,6 +136,6 @@ def run(ctx) -> AnalysisResult:
         tables=tabelas,
         charts=charts,
         insights=insights,
-        intro="Inspirado no gráfico de contribuições do GitHub: cada quadradinho é um dia, "
-        "colorido com a cor de quem venceu aquele dia na métrica.",
+        intro="Cada quadrado é um dia; a cor mostra quem mais mandou mensagens, "
+        "caracteres, áudios ou figurinhas naquele dia. Cinza é dia sem atividade.",
     )

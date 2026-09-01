@@ -1,5 +1,5 @@
-"""Ranking de "quem venceu o dia" em cada métrica: mensagens, caracteres,
-áudios e figurinhas enviadas.
+"""Quantidade de dias em que cada pessoa teve o maior número de mensagens,
+caracteres, áudios ou figurinhas.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from ..utils import formatar_numero
 from ._daywinner import METRICAS, ranking_dias_vencidos, vencedores_por_dia
 
 KEY = "ranking_dias"
-TITLE = "Ranking de dias vencidos"
+TITLE = "Ranking de dias"
 ICON = "trofeu"
 REQUIRES_MEDIA = False
 
@@ -32,26 +32,23 @@ def run(ctx) -> AnalysisResult:
         if ranking["dias_vencidos"].sum() == 0:
             continue
 
-        tabelas[f"ranking_dias_{metrica['chave']}"] = ranking
-
         slug = _NUMERACAO_SLUG[metrica["chave"]]
+        tabelas[f"dias_com_mais_{metrica['chave']}"] = ranking
+
         charts.append(
             ChartArtifact(
-                slug=f"{slug}_ranking_dias_{metrica['chave']}",
-                title=f"Dias em que mais {metrica['rotulo'].lower()}",
+                slug=f"{slug}_dias_com_mais_{metrica['chave']}",
+                title=f"Dias com mais {metrica['plural']}",
                 figure=grafico_barras_por_pessoa(
-                    ranking, "dias_vencidos",
-                    f"Ranking de dias — quem mais {metrica['rotulo'].lower()}",
-                    "Dias em 1º lugar", ctx.color_map,
-                    subtitulo="Conta 1 dia sempre que a pessoa foi quem mais teve essa métrica naquele dia.",
+                    ranking, "dias_vencidos", f"Dias com mais {metrica['plural']}",
+                    "Quantidade de dias", ctx.color_map,
                 ),
             )
         )
 
         lider = ranking.iloc[0]
         insights.append(
-            f"{lider['nome']} venceu mais dias em \"{metrica['rotulo'].lower()}\": "
-            f"{formatar_numero(lider['dias_vencidos'])} dias."
+            f"{lider['nome']}: {formatar_numero(lider['dias_vencidos'])} dias com mais {metrica['rotulo']}."
         )
 
     return AnalysisResult(
@@ -61,6 +58,5 @@ def run(ctx) -> AnalysisResult:
         tables=tabelas,
         charts=charts,
         insights=insights,
-        intro="Para cada dia do histórico, vemos quem 'ganhou' aquele dia em cada métrica — "
-        "e contamos quantos dias cada pessoa já venceu.",
+        intro="Em quantos dias cada pessoa teve o maior número de mensagens, caracteres, áudios ou figurinhas.",
     )

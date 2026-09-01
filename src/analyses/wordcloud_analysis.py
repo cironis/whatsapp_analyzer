@@ -111,6 +111,5 @@ def run(ctx) -> AnalysisResult:
         title=TITLE,
         icon=ICON,
         charts=charts,
-        insights=["As palavras mais repetidas por cada pessoa e pelo grupo como um todo."],
-        intro="As palavras mais usadas, com o tamanho proporcional à frequência.",
+        intro="As palavras mais usadas por cada pessoa e pelo grupo, com o tamanho proporcional à frequência.",
     )
