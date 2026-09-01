@@ -162,3 +162,24 @@ def maior_sequencia_por_pessoa(df: pd.DataFrame) -> pd.DataFrame:
         .sort_values("maximo_dias_consecutivos", ascending=False)
         .reset_index(drop=True)
     )
+
+
+def resumo_por_conversa(df: pd.DataFrame) -> pd.DataFrame:
+    """Uma linha por conversa (ver `numero_conversa`): início, fim, duração e
+    volume de mensagens/figurinhas. Base para médias por conversa e para os
+    recordes de conversa mais longa (duração e quantidade de mensagens).
+    """
+
+    resumo = (
+        df.groupby("numero_conversa", observed=True)
+        .agg(
+            inicio=("data", "min"),
+            fim=("data", "max"),
+            quantidade_mensagens=("data", "size"),
+            quantidade_figurinhas=("figurinha", "sum"),
+        )
+        .reset_index()
+    )
+    resumo["duracao_segundos"] = (resumo["fim"] - resumo["inicio"]).dt.total_seconds()
+
+    return resumo

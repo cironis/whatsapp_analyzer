@@ -50,6 +50,34 @@ def formatar_duracao(segundos) -> str:
     return f"{minutos:02d}:{segundos_restantes:02d}"
 
 
+def formatar_duracao_extensa(segundos) -> str:
+    """Formata uma duração longa (ex.: uma conversa) por extenso, em português,
+    como "2 dias, 3h e 20min" — diferente de `formatar_duracao`, pensada para
+    a duração (curta) de um único áudio.
+    """
+
+    if pd.isna(segundos):
+        return "não disponível"
+
+    total_segundos = max(0, int(round(float(segundos))))
+    dias, resto = divmod(total_segundos, 86400)
+    horas, resto = divmod(resto, 3600)
+    minutos, _ = divmod(resto, 60)
+
+    partes = []
+    if dias:
+        partes.append(f"{dias} dia" + ("s" if dias != 1 else ""))
+    if horas:
+        partes.append(f"{horas}h")
+    if minutos or not partes:
+        partes.append(f"{minutos}min")
+
+    if len(partes) == 1:
+        return partes[0]
+
+    return ", ".join(partes[:-1]) + " e " + partes[-1]
+
+
 MESES_PT = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
     5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
