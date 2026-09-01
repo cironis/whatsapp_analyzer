@@ -246,7 +246,7 @@ def run(ctx) -> AnalysisResult:
         tables=tabelas,
         charts=charts,
         insights=insights,
-        intro="Uma conversa nova começa após 2h de silêncio. Quem inicia, quem encerra, "
+        intro="Uma conversa nova começa após 1h de silêncio. Quem inicia, quem encerra, "
         "as médias de mensagens e figurinhas por conversa e os recordes de conversa mais "
         "longa — por duração e por quantidade de mensagens.",
     )

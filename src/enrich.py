@@ -12,7 +12,7 @@ import pandas as pd
 from .media_store import classificar_por_nome_arquivo
 from .utils import limpar_texto_invisivel
 
-LIMITE_CONVERSA_HORAS = 2
+LIMITE_CONVERSA_HORAS = 1
 
 ORDEM_DIAS_SEMANA = [
     "Segunda-feira",
