@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Exportações reais do WhatsApp nunca devem ir para o repositório.
+*.zip
+!*/graficos_exemplo.zip
+
+# Saídas locais de teste.
+out_test.zip
+out_test.pdf
+preview/
+
+.DS_Store
