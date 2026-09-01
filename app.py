@@ -1,15 +1,24 @@
 """WhatsApp Analyzer — interface Streamlit.
 
 Fluxo: 1) enviar o .zip exportado do WhatsApp → 2) renomear participantes
-(opcional) → 3) gerar e baixar o ZIP de gráficos e o PDF do relatório.
+(opcional) → 3) escolher o período a analisar (geral, um mês específico ou
+um intervalo de datas) → 4) gerar e baixar o ZIP de gráficos e o PDF do
+relatório.
 """
 
 from __future__ import annotations
 
 import streamlit as st
 
+from src.analyses import ANALISES
 from src.parsing import ArquivoInvalidoError
-from src.pipeline import carregar_para_renomear, executar_analise
+from src.pipeline import (
+    carregar_para_renomear,
+    executar_analise,
+    limites_periodo_disponivel,
+    listar_meses_disponiveis,
+)
+from src.utils import formatar_mes_ano
 
 st.set_page_config(page_title="WhatsApp Analyzer", page_icon="💬", layout="centered")
 
@@ -99,11 +108,52 @@ if dados is not None:
             key=f"rotulo_{sufixo}",
         )
 
-        st.write("**3. Gerar o relatório**")
+        st.write("**3. Selecione o período a analisar**")
+        st.caption(
+            "O relatório sempre deixa claro, na capa, qual período foi analisado."
+        )
+
+        data_minima, data_maxima = limites_periodo_disponivel(dados)
+        opcoes_periodo = ["Geral (todo o histórico)", "Mês e ano específico", "Período personalizado"]
+        modo_escolhido = st.radio(
+            "Período da análise", opcoes_periodo, key=f"modo_periodo_{sufixo}", horizontal=True,
+        )
+
+        filtro_periodo = {"modo": "geral"}
+
+        if modo_escolhido == opcoes_periodo[1]:
+            meses_disponiveis = listar_meses_disponiveis(dados)
+            rotulos_meses = [formatar_mes_ano(ano, mes) for ano, mes in meses_disponiveis]
+
+            rotulo_mes_escolhido = st.selectbox(
+                "Mês e ano",
+                rotulos_meses,
+                index=len(rotulos_meses) - 1,
+                key=f"mes_ano_{sufixo}",
+            )
+            ano_escolhido, mes_escolhido = meses_disponiveis[rotulos_meses.index(rotulo_mes_escolhido)]
+            filtro_periodo = {"modo": "mes_ano", "ano": ano_escolhido, "mes": mes_escolhido}
+
+        elif modo_escolhido == opcoes_periodo[2]:
+            intervalo = st.date_input(
+                "Período (data inicial e final)",
+                value=(data_minima, data_maxima),
+                min_value=data_minima,
+                max_value=data_maxima,
+                key=f"periodo_datas_{sufixo}",
+            )
+
+            if isinstance(intervalo, tuple) and len(intervalo) == 2:
+                filtro_periodo = {"modo": "periodo", "inicio": intervalo[0], "fim": intervalo[1]}
+            else:
+                st.info("Selecione as duas datas (inicial e final) para aplicar o filtro de período.")
+                filtro_periodo = {"modo": "periodo", "inicio": data_minima, "fim": data_maxima}
+
+        st.write("**4. Gerar o relatório**")
 
         if st.button("🚀 Gerar análise", type="primary"):
             barra = st.progress(0.0, text="Iniciando...")
-            total_etapas = 9
+            total_etapas = len(ANALISES)
             contador = {"n": 0}
 
             def _progresso(titulo: str) -> None:
@@ -115,6 +165,7 @@ if dados is not None:
                     dados,
                     mapa_nomes,
                     rotulo_grupo=rotulo_grupo.strip() or "Conversa do WhatsApp",
+                    filtro_periodo=filtro_periodo,
                     progresso=_progresso,
                 )
                 st.session_state.resultado = resultado
@@ -131,6 +182,10 @@ if resultado is not None:
     st.subheader("Pronto! 🎉")
 
     meta = resultado.meta
+    st.caption(
+        f"Período analisado: **{meta['periodo_inicio']} a {meta['periodo_fim']}** "
+        f"({meta['recorte_periodo']})."
+    )
     coluna1, coluna2, coluna3, coluna4 = st.columns(4)
     coluna1.metric("Participantes", meta["num_pessoas"])
     coluna2.metric("Mensagens", f"{meta['total_mensagens']:,}".replace(",", "."))

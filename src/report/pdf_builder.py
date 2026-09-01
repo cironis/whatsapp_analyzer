@@ -174,7 +174,10 @@ def _construir_capa(meta: dict, estilos: dict) -> list:
         Spacer(1, 0.5 * cm),
         Paragraph("Análise da Conversa do WhatsApp", estilos["capa_titulo"]),
         Paragraph(meta["rotulo_grupo"], estilos["capa_subtitulo"]),
-        Paragraph(f"{meta['periodo_inicio']} — {meta['periodo_fim']}", estilos["capa_subtitulo"]),
+        Paragraph(
+            f"{meta['periodo_inicio']} — {meta['periodo_fim']} · {meta['recorte_periodo']}",
+            estilos["capa_subtitulo"],
+        ),
         Spacer(1, 0.7 * cm),
         HRFlowable(width="35%", thickness=1.6, color=_cor(BRAND["accent"]), spaceAfter=16, hAlign="CENTER"),
         _grade_kpis(

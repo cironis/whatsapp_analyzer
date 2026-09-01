@@ -175,7 +175,12 @@ def run(ctx) -> AnalysisResult:
         )
         resumo_audio["tempo_total_minutos"] = (resumo_audio["tempo_total_segundos"] / 60).round(2)
         resumo_audio["tempo_total_formatado"] = resumo_audio["tempo_total_segundos"].apply(formatar_duracao)
+        divisor = resumo_audio["quantidade_audios"].astype(float).replace(0.0, float("nan"))
+        resumo_audio["duracao_media_segundos"] = resumo_audio["tempo_total_segundos"] / divisor
+        resumo_audio["duracao_media_formatada"] = resumo_audio["duracao_media_segundos"].apply(formatar_duracao)
         resumo_audio = resumo_audio.sort_values("tempo_total_segundos", ascending=False).reset_index(drop=True)
+
+        duracao_media_grupo = float(audios["duracao_audio_segundos"].mean(skipna=True) or 0)
 
         charts.append(
             ChartArtifact(
@@ -187,6 +192,22 @@ def run(ctx) -> AnalysisResult:
                 ),
             )
         )
+
+        quem_manda_audio = resumo_audio.loc[resumo_audio["quantidade_audios"] > 0]
+        if not quem_manda_audio.empty:
+            charts.append(
+                ChartArtifact(
+                    slug="14b_duracao_media_audio_por_pessoa",
+                    title="Duração média por áudio",
+                    figure=grafico_barras_por_pessoa(
+                        quem_manda_audio.sort_values("duracao_media_segundos", ascending=False),
+                        "duracao_media_segundos", "Duração média de cada áudio enviado",
+                        "Segundos por áudio (média)", ctx.color_map, formato_valor="{:.0f}s",
+                        linha_media=duracao_media_grupo,
+                    ),
+                )
+            )
+
         tabelas["resumo_audio_por_pessoa"] = resumo_audio
         tabelas["audios_detalhados"] = audios[
             ["data", "nome", "nome_arquivo_anexo", "duracao_audio_segundos", "duracao_audio_formatada"]
@@ -197,6 +218,17 @@ def run(ctx) -> AnalysisResult:
             f"{campeao_audio['nome']} tem mais tempo de áudio: "
             f"{campeao_audio['tempo_total_formatado']} ({formatar_numero(campeao_audio['quantidade_audios'])} áudios)."
         )
+        insights.append(
+            f"Cada áudio dura, em média, {formatar_duracao(duracao_media_grupo)} no grupo todo."
+        )
+        if not quem_manda_audio.empty:
+            campeao_duracao_media = quem_manda_audio.sort_values(
+                "duracao_media_segundos", ascending=False
+            ).iloc[0]
+            insights.append(
+                f"{campeao_duracao_media['nome']} manda os áudios mais longos em média: "
+                f"{campeao_duracao_media['duracao_media_formatada']} por áudio."
+            )
 
     top_figurinhas, miniaturas = _top_figurinhas_por_pessoa(ctx.df, ctx.media_store, QUANTIDADE_TOP_FIGURINHAS)
 

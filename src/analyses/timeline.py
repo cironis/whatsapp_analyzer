@@ -1,4 +1,9 @@
-"""Evolução recente: mensagens e caracteres por dia, pessoa a pessoa."""
+"""Evolução recente: mensagens e caracteres por dia, pessoa a pessoa.
+
+Por padrão mostra os últimos 30 dias disponíveis no histórico. Quando o
+pipeline filtra a análise por um mês/ano específico, `ctx` chega com a
+janela e o título já calculados para o mês inteiro (ver `pipeline.py`).
+"""
 
 from __future__ import annotations
 
@@ -8,7 +13,7 @@ from ..chart_common import grafico_linha_temporal
 from ..models import AnalysisResult, ChartArtifact
 
 KEY = "linha_do_tempo"
-TITLE = "Últimos 30 dias"
+TITLE = "Evolução recente"
 ICON = "relogio"
 REQUIRES_MEDIA = False
 
@@ -18,8 +23,15 @@ QUANTIDADE_DIAS = 30
 def run(ctx) -> AnalysisResult:
     df = ctx.df
 
-    data_final = df["data_calendario"].max()
-    data_inicial = data_final - pd.Timedelta(days=QUANTIDADE_DIAS - 1)
+    if ctx.janela_recente_inicio is not None and ctx.janela_recente_fim is not None:
+        data_inicial, data_final = ctx.janela_recente_inicio, ctx.janela_recente_fim
+    else:
+        data_final = df["data_calendario"].max()
+        data_inicial = max(
+            data_final - pd.Timedelta(days=QUANTIDADE_DIAS - 1), df["data_calendario"].min()
+        )
+
+    titulo_janela = ctx.janela_recente_titulo or f"Últimos {QUANTIDADE_DIAS} dias"
 
     periodo = pd.date_range(start=data_inicial, end=data_final, freq="D")
     grade = pd.MultiIndex.from_product([periodo, ctx.people], names=["data_calendario", "nome"]).to_frame(index=False)
@@ -45,19 +57,19 @@ def run(ctx) -> AnalysisResult:
     charts = [
         ChartArtifact(
             slug="10_mensagens_ultimos_30_dias",
-            title="Mensagens por dia — últimos 30 dias",
+            title=f"Mensagens por dia — {titulo_janela}",
             figure=grafico_linha_temporal(
                 mensagens, "data_calendario", "quantidade_mensagens", "nome",
-                "Mensagens por dia e pessoa — últimos 30 dias",
+                f"Mensagens por dia e pessoa — {titulo_janela}",
                 "Quantidade de mensagens", ctx.color_map,
             ),
         ),
         ChartArtifact(
             slug="11_caracteres_ultimos_30_dias",
-            title="Caracteres por dia — últimos 30 dias",
+            title=f"Caracteres por dia — {titulo_janela}",
             figure=grafico_linha_temporal(
                 caracteres, "data_calendario", "total_caracteres", "nome",
-                "Caracteres enviados por dia e pessoa — últimos 30 dias",
+                f"Caracteres enviados por dia e pessoa — {titulo_janela}",
                 "Quantidade de caracteres", ctx.color_map,
             ),
         ),
@@ -69,10 +81,10 @@ def run(ctx) -> AnalysisResult:
 
     return AnalysisResult(
         key=KEY,
-        title=TITLE,
+        title=titulo_janela,
         icon=ICON,
         tables={"mensagens_30_dias": mensagens, "caracteres_30_dias": caracteres},
         charts=charts,
         insights=insights,
-        intro="Mensagens e caracteres por dia, pessoa a pessoa, no último mês do histórico.",
+        intro=f"Mensagens e caracteres por dia, pessoa a pessoa — {titulo_janela}.",
     )

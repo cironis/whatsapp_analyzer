@@ -50,6 +50,19 @@ def formatar_duracao(segundos) -> str:
     return f"{minutos:02d}:{segundos_restantes:02d}"
 
 
+MESES_PT = {
+    1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+    5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+    9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
+}
+
+
+def formatar_mes_ano(ano: int, mes: int) -> str:
+    """Formata ano/mês como "Janeiro de 2026", sem depender de locale do sistema."""
+
+    return f"{MESES_PT[mes]} de {ano}"
+
+
 def formatar_numero(numero) -> str:
     """Formata um número inteiro com separador de milhar (padrão BR)."""
 

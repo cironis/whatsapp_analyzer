@@ -14,12 +14,14 @@ from . import (
     media_gallery,
     media_stats,
     messages,
+    person_activity,
     timeline,
     wordcloud_analysis,
 )
 
 ANALISES = [
     messages,
+    person_activity,
     characters,
     conversations,
     timeline,

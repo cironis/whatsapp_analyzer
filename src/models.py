@@ -8,9 +8,12 @@ pipeline, o ZIP de imagens e o PDF sabem consumir.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional
+from datetime import datetime
+from typing import TYPE_CHECKING, Optional, Union
 
 import pandas as pd
+
+Timestamp = Union[pd.Timestamp, datetime]
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
@@ -42,6 +45,13 @@ class AnalysisContext:
     has_media: bool
     media_store: Optional["MediaStore"]
     group_label: str = "a conversa"
+    # Janela usada pela análise de "evolução recente" (src/analyses/timeline.py):
+    # por padrão (None) ela mesma calcula os últimos 30 dias disponíveis; quando
+    # o pipeline filtra por um mês/ano específico, ele preenche esses campos para
+    # que o gráfico mostre o mês inteiro em vez da janela de 30 dias.
+    janela_recente_inicio: Optional[Timestamp] = None
+    janela_recente_fim: Optional[Timestamp] = None
+    janela_recente_titulo: Optional[str] = None
 
 
 @dataclass

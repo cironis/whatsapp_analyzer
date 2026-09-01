@@ -33,6 +33,8 @@ def run(ctx) -> AnalysisResult:
         .reset_index(drop=True)
     )
 
+    media_do_grupo = float(texto["quantidade_caracteres"].mean()) if not texto.empty else 0.0
+
     charts = [
         ChartArtifact(
             slug="05_total_caracteres_por_pessoa",
@@ -48,6 +50,7 @@ def run(ctx) -> AnalysisResult:
             figure=grafico_barras_por_pessoa(
                 media_por_pessoa, "media_caracteres", "Média de caracteres por mensagem",
                 "Caracteres (média)", ctx.color_map, formato_valor="{:.1f}",
+                linha_media=media_do_grupo,
             ),
         ),
     ]
@@ -60,6 +63,7 @@ def run(ctx) -> AnalysisResult:
         f"{formatar_numero(campeao_volume['total_caracteres'])} caracteres.",
         f"{campeao_prolixo['nome']} manda as mensagens mais longas, "
         f"com {campeao_prolixo['media_caracteres']:.0f} caracteres em média.",
+        f"A média geral do grupo é de {media_do_grupo:.0f} caracteres por mensagem.",
     ]
 
     return AnalysisResult(

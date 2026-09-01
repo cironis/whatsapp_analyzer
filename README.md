@@ -8,7 +8,9 @@ Aplicativo Streamlit que recebe o `.zip` exportado de uma conversa do WhatsApp
 
 Antes de gerar o relatório, é possível **renomear cada participante**, para
 que o apelido original do WhatsApp não precise aparecer no PDF nem nas
-imagens.
+imagens, e escolher o **período a analisar**: todo o histórico, um mês/ano
+específico (mostrando o mês inteiro) ou um intervalo de datas personalizado.
+O período escolhido sempre aparece de forma explícita na capa do relatório.
 
 ## Rodando localmente
 
@@ -33,7 +35,7 @@ nenhum pacote de sistema extra além do `requirements.txt`.
 ## Estrutura do código
 
 ```
-app.py                      → interface Streamlit (upload → renomear → gerar)
+app.py                      → interface Streamlit (upload → renomear → período → gerar)
 src/
   parsing.py                 → lê o .zip/.txt exportado e extrai as mensagens
   media_store.py              → acesso aos anexos dentro do .zip (se houver)
