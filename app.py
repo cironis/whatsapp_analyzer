@@ -30,8 +30,7 @@ if "dados" not in st.session_state:
 st.title("💬 Analisador de Conversas do WhatsApp")
 st.write(
     "Envie o **.zip** exportado de uma conversa do WhatsApp (com ou sem mídia) e "
-    "receba um pacote com os gráficos em imagem e um relatório em PDF — sem que os "
-    "apelidos originais do WhatsApp precisem aparecer no relatório."
+    "receba um pacote com os gráficos em imagem e um relatório em PDF."
 )
 
 with st.expander("Como exportar a conversa do WhatsApp"):
