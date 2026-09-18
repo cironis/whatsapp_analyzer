@@ -9,6 +9,7 @@ gráfico de tipos aparece; caso contrário, mostramos só o total.
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from ..chart_common import grafico_barras_por_pessoa
 from ..colors import BRAND, PERSON_PALETTE
@@ -81,6 +82,16 @@ def run(ctx) -> AnalysisResult:
         .reset_index(drop=True)
     )
 
+    mensagens_por_pessoa = df.groupby("nome", observed=True).size().reindex(ctx.people, fill_value=0)
+    figurinhas_por_pessoa = df.groupby("nome", observed=True)["figurinha"].sum().reindex(ctx.people, fill_value=0)
+    divisor_mensagens = mensagens_por_pessoa.replace(0, pd.NA).astype(float)
+    razao_figurinha = (
+        (figurinhas_por_pessoa / divisor_mensagens * 100)
+        .fillna(0.0)
+        .rename("percentual_figurinhas")
+        .reset_index()
+    )
+
     charts = [
         ChartArtifact(
             slug="12_midias_por_pessoa",
@@ -90,13 +101,29 @@ def run(ctx) -> AnalysisResult:
                 "Quantidade de mídias", ctx.color_map,
             ),
         ),
+        ChartArtifact(
+            slug="12b_razao_figurinha_mensagem",
+            title="Razão figurinha/mensagem por pessoa",
+            figure=grafico_barras_por_pessoa(
+                razao_figurinha, "percentual_figurinhas", "Quanto de cada pessoa é figurinha",
+                "% das mensagens que são figurinhas", ctx.color_map, formato_valor="{:.1f}%",
+            ),
+        ),
     ]
 
-    tabelas = {"midias_por_pessoa": total_por_pessoa}
+    tabelas = {"midias_por_pessoa": total_por_pessoa, "razao_figurinha_mensagem": razao_figurinha}
     lider = total_por_pessoa.iloc[0]
     insights = [
         f"{lider['nome']} enviou mais mídia no total: {formatar_numero(lider['quantidade_midias'])} arquivos.",
     ]
+
+    if razao_figurinha["percentual_figurinhas"].sum() > 0:
+        campeao_figurinha_pct = razao_figurinha.sort_values("percentual_figurinhas", ascending=False).iloc[0]
+        insights.append(
+            f"{campeao_figurinha_pct['nome']} é quem mais usa figurinha proporcionalmente: "
+            f"{campeao_figurinha_pct['percentual_figurinhas']:.1f}% das mensagens enviadas por essa pessoa "
+            "são figurinhas."
+        )
 
     if ctx.has_media:
         pivot = (

@@ -62,6 +62,10 @@ def _estilos() -> dict:
             "secao_titulo", fontName="Helvetica-Bold", fontSize=17, leading=20,
             textColor=_cor(BRAND["dark"]),
         ),
+        "resumo_item_titulo": ParagraphStyle(
+            "resumo_item_titulo", fontName="Helvetica-Bold", fontSize=12.5, leading=15,
+            textColor=_cor(BRAND["dark"]), spaceBefore=10, spaceAfter=2,
+        ),
         "intro": ParagraphStyle(
             "intro", fontName="Helvetica-Oblique", fontSize=10, leading=14,
             textColor=_cor(BRAND["muted"]), spaceAfter=8,
@@ -192,7 +196,6 @@ def _construir_capa(meta: dict, estilos: dict) -> list:
         ),
         Spacer(1, 1.3 * cm),
         Paragraph(f"Relatório gerado em {meta['gerado_em']}.", estilos["rodape_capa"]),
-        Paragraph("Os nomes exibidos foram configurados por quem gerou este relatório.", estilos["rodape_capa"]),
         PageBreak(),
     ]
 
@@ -217,6 +220,35 @@ def _cabecalho_secao(resultado, estilos: dict):
         )
     )
     return tabela
+
+
+def _construir_resumo_geral(resultados: list, estilos: dict) -> list:
+    """Página logo após a capa: o resumo escrito de todas as análises juntas,
+    para dar uma visão geral antes de entrar seção por seção.
+    """
+
+    elementos = [
+        Paragraph("Resumo das análises", estilos["secao_titulo"]),
+        HRFlowable(width="100%", thickness=0.8, color=_cor(BRAND["line"]), spaceAfter=10),
+    ]
+
+    for resultado in resultados:
+        if not resultado.intro and not resultado.insights:
+            continue
+
+        bloco = [Paragraph(resultado.title, estilos["resumo_item_titulo"])]
+
+        if resultado.intro:
+            bloco.append(Paragraph(resultado.intro, estilos["intro"]))
+
+        for texto in resultado.insights:
+            bloco.append(Paragraph(f"● {texto}", estilos["insight"]))
+
+        elementos.append(KeepTogether(bloco))
+
+    elementos.append(PageBreak())
+
+    return elementos
 
 
 def _construir_bloco_secao(resultado, estilos: dict) -> list:
@@ -251,6 +283,7 @@ def construir_pdf(resultados: list, meta: dict) -> bytes:
     doc.addPageTemplates([PageTemplate(id="pagina", frames=[quadro], onPage=_rodape)])
 
     historia = list(_construir_capa(meta, estilos))
+    historia.extend(_construir_resumo_geral(resultados, estilos))
 
     for resultado in resultados:
         if not resultado.charts:

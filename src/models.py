@@ -45,6 +45,10 @@ class AnalysisContext:
     has_media: bool
     media_store: Optional["MediaStore"]
     group_label: str = "a conversa"
+    # "geral" (histórico completo), "mes_ano" (um mês específico) ou "periodo"
+    # (intervalo livre) — usado por `analyses/evolucao_periodica.py` para decidir
+    # se quebra a evolução por mês ou por semana.
+    periodo_modo: str = "geral"
     # Janela usada pela análise de "evolução recente" (src/analyses/timeline.py):
     # por padrão (None) ela mesma calcula os últimos 30 dias disponíveis; quando
     # o pipeline filtra por um mês/ano específico, ele preenche esses campos para

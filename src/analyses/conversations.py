@@ -5,22 +5,64 @@ longa — por duração e por quantidade de mensagens.
 
 from __future__ import annotations
 
+import matplotlib.pyplot as plt
 import pandas as pd
 
 from ..chart_common import grafico_barras_por_pessoa
+from ..colors import BRAND
 from ..enrich import (
     MAPA_DIAS_SEMANA,
-    maior_sequencia_do_grupo,
+    maior_sequencia_do_grupo_com_periodo,
     maior_sequencia_por_pessoa,
     resumo_por_conversa,
+    sequencia_atual_por_pessoa,
 )
 from ..models import AnalysisResult, ChartArtifact
-from ..utils import formatar_duracao_extensa, formatar_numero
+from ..style import FIGSIZE_PADRAO, estilizar_eixo, rodape_assinatura, rotular_barras
+from ..utils import formatar_duracao_extensa, formatar_numero, truncar
 
 KEY = "conversas"
 TITLE = "Conversas e sequências"
 ICON = "faisca"
 REQUIRES_MEDIA = False
+
+
+def _grafico_sequencia_atual_vs_recorde(tabela: pd.DataFrame, titulo: str):
+    """Duas barras por pessoa: sequência de dias consecutivos em andamento
+    agora vs. o recorde histórico dela — para ver quem está perto de bater
+    o próprio recorde.
+    """
+
+    largura = max(FIGSIZE_PADRAO[0], 1.3 * len(tabela) + 3)
+    fig, ax = plt.subplots(figsize=(largura, FIGSIZE_PADRAO[1]))
+
+    posicoes = range(len(tabela))
+    largura_barra = 0.34
+
+    ax.bar(
+        [p - largura_barra / 2 for p in posicoes], tabela["sequencia_atual"],
+        width=largura_barra, color=BRAND["accent"], label="Sequência atual", zorder=3,
+    )
+    ax.bar(
+        [p + largura_barra / 2 for p in posicoes], tabela["maximo_dias_consecutivos"],
+        width=largura_barra, color=BRAND["primary"], label="Recorde histórico", zorder=3,
+    )
+
+    ax.set_title(titulo)
+    ax.set_ylabel("Dias consecutivos")
+    ax.set_xticks(list(posicoes))
+    ax.set_xticklabels([truncar(n, 16) for n in tabela["nome"]])
+    topo = max(tabela["sequencia_atual"].max(), tabela["maximo_dias_consecutivos"].max(), 1)
+    ax.set_ylim(0, topo * 1.22)
+    estilizar_eixo(ax)
+    rotular_barras(ax, "{:.0f}")
+    plt.setp(ax.get_xticklabels(), rotation=20, ha="right")
+    ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), borderaxespad=0)
+
+    fig.tight_layout()
+    rodape_assinatura(fig)
+
+    return fig
 
 
 def _pessoas_da_conversa(df: pd.DataFrame, numero_conversa: int, people: list) -> pd.DataFrame:
@@ -36,6 +78,15 @@ def _pessoas_da_conversa(df: pd.DataFrame, numero_conversa: int, people: list) -
         .sort_values("quantidade_mensagens", ascending=False)
         .reset_index(drop=True)
     )
+
+
+def _formatar_periodo_dias(inicio: pd.Timestamp, fim: pd.Timestamp) -> str:
+    """Formata o período (datas, sem hora) de uma sequência de dias consecutivos."""
+
+    if inicio.normalize() == fim.normalize():
+        return f"em {inicio.strftime('%d/%m/%Y')}"
+
+    return f"de {inicio.strftime('%d/%m/%Y')} a {fim.strftime('%d/%m/%Y')}"
 
 
 def _formatar_intervalo(inicio: pd.Timestamp, fim: pd.Timestamp) -> str:
@@ -76,7 +127,14 @@ def run(ctx) -> AnalysisResult:
     )
 
     sequencias = maior_sequencia_por_pessoa(df)
-    sequencia_grupo = maior_sequencia_do_grupo(df)
+    tamanho_sequencia_grupo, inicio_sequencia_grupo, fim_sequencia_grupo = maior_sequencia_do_grupo_com_periodo(df)
+    dias_possiveis_periodo = int((df["data_calendario"].max() - df["data_calendario"].min()).days + 1)
+
+    sequencia_atual = sequencia_atual_por_pessoa(df)
+    comparacao_sequencias = sequencias[["nome", "maximo_dias_consecutivos"]].merge(
+        sequencia_atual, on="nome", how="left"
+    )
+    comparacao_sequencias["sequencia_atual"] = comparacao_sequencias["sequencia_atual"].fillna(0).astype(int)
 
     resumo = resumo_por_conversa(df)
 
@@ -128,7 +186,19 @@ def run(ctx) -> AnalysisResult:
             title="Maior sequência de dias consecutivos",
             figure=grafico_barras_por_pessoa(
                 sequencias, "maximo_dias_consecutivos", "Maior sequência de dias seguidos mandando mensagem",
-                "Dias consecutivos", ctx.color_map,
+                f"Dias consecutivos (de {dias_possiveis_periodo} no período)", ctx.color_map,
+                formato_valor="{:.0f}" + f"/{dias_possiveis_periodo}",
+            ),
+            caption=" · ".join(
+                f"{linha['nome']}: {_formatar_periodo_dias(linha['sequencia_inicio'], linha['sequencia_fim'])}"
+                for _, linha in sequencias.loc[sequencias["maximo_dias_consecutivos"] > 0].iterrows()
+            ),
+        ),
+        ChartArtifact(
+            slug="09aa_sequencia_atual_vs_recorde",
+            title="Sequência atual vs. recorde, por pessoa",
+            figure=_grafico_sequencia_atual_vs_recorde(
+                comparacao_sequencias, "Sequência em andamento vs. recorde pessoal",
             ),
         ),
         ChartArtifact(
@@ -156,6 +226,7 @@ def run(ctx) -> AnalysisResult:
         "conversas_iniciadas": iniciadas,
         "conversas_finalizadas": finalizadas,
         "sequencia_por_pessoa": sequencias,
+        "sequencia_atual_vs_recorde": comparacao_sequencias,
         "media_mensagens_por_conversa": media_mensagens_pessoa,
         "conversa_mais_longa_duracao_pessoas": tabela_pessoas_duracao,
     }
@@ -185,13 +256,34 @@ def run(ctx) -> AnalysisResult:
     insights = [
         f"{quem_inicia['nome']} iniciou mais conversas: {formatar_numero(quem_inicia['conversas_iniciadas'])} vezes.",
         f"{quem_finaliza['nome']} falou por último mais vezes: {formatar_numero(quem_finaliza['conversas_finalizadas'])}.",
-        f"Sequência mais longa do grupo: {formatar_numero(sequencia_grupo)} dias seguidos com mensagem. "
-        f"Recorde individual: {quem_mais_sequencia['nome']}, com {formatar_numero(quem_mais_sequencia['maximo_dias_consecutivos'])} dias.",
+        f"Sequência mais longa do grupo: {formatar_numero(tamanho_sequencia_grupo)}/{dias_possiveis_periodo} dias "
+        f"seguidos com mensagem, {_formatar_periodo_dias(inicio_sequencia_grupo, fim_sequencia_grupo)}. "
+        f"Recorde individual: {quem_mais_sequencia['nome']}, com "
+        f"{formatar_numero(quem_mais_sequencia['maximo_dias_consecutivos'])}/{dias_possiveis_periodo} dias "
+        f"({_formatar_periodo_dias(quem_mais_sequencia['sequencia_inicio'], quem_mais_sequencia['sequencia_fim'])}).",
         f"Média do grupo: {media_mensagens_grupo:.1f} mensagens por conversa"
         + (f" e {media_figurinhas_grupo:.2f} figurinhas por conversa." if ctx.has_media else "."),
         f"{lider_media_mensagens['nome']} é quem mais mensagens manda por conversa, em média: "
         f"{lider_media_mensagens['media_mensagens_por_conversa']:.1f}.",
     ]
+
+    em_andamento = comparacao_sequencias.loc[comparacao_sequencias["sequencia_atual"] > 0].sort_values(
+        "sequencia_atual", ascending=False
+    )
+    if not em_andamento.empty:
+        lider_atual = em_andamento.iloc[0]
+        falta = int(lider_atual["maximo_dias_consecutivos"] - lider_atual["sequencia_atual"])
+        if falta <= 0:
+            insights.append(
+                f"{lider_atual['nome']} está numa sequência atual de {formatar_numero(lider_atual['sequencia_atual'])} "
+                "dias — igualando ou já superando o próprio recorde."
+            )
+        else:
+            insights.append(
+                f"{lider_atual['nome']} está numa sequência atual de {formatar_numero(lider_atual['sequencia_atual'])} dias — "
+                f"faltam {formatar_numero(falta)} para igualar o recorde pessoal de "
+                f"{formatar_numero(lider_atual['maximo_dias_consecutivos'])}."
+            )
 
     if ctx.has_media:
         lider_media_figurinhas = media_figurinhas_pessoa.sort_values(
@@ -247,6 +339,7 @@ def run(ctx) -> AnalysisResult:
         charts=charts,
         insights=insights,
         intro="Uma conversa nova começa após 1h de silêncio. Quem inicia, quem encerra, "
-        "as médias de mensagens e figurinhas por conversa e os recordes de conversa mais "
+        "as sequências de dias seguidos (recorde e a que está em andamento agora), as "
+        "médias de mensagens e figurinhas por conversa e os recordes de conversa mais "
         "longa — por duração e por quantidade de mensagens.",
     )

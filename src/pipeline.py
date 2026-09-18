@@ -153,6 +153,7 @@ def executar_analise(
         has_media=dados.media_store.has_media,
         media_store=dados.media_store,
         group_label=rotulo_grupo,
+        periodo_modo=(filtro_periodo or {"modo": "geral"}).get("modo", "geral"),
         janela_recente_inicio=janela_inicio,
         janela_recente_fim=janela_fim,
         janela_recente_titulo=titulo_janela,

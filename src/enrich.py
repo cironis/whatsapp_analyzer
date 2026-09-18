@@ -77,25 +77,40 @@ def _classificar_conteudo(mensagem, nome_arquivo_anexo):
     return "texto", None
 
 
-def _maior_sequencia_consecutiva(datas) -> int:
-    """Maior sequência de dias consecutivos com pelo menos uma mensagem."""
+def maior_sequencia_consecutiva(datas) -> tuple:
+    """Maior sequência de dias consecutivos com pelo menos uma mensagem.
+
+    Devolve (tamanho, inicio, fim) da sequência mais longa. Em caso de
+    empate, fica com a primeira ocorrência (mais antiga). Pública porque
+    também é usada por `analyses/evolucao_periodica.py` (sequência dentro
+    de cada mês/semana).
+    """
 
     datas_unicas = sorted(pd.Series(datas).dropna().unique())
 
     if not datas_unicas:
-        return 0
+        return 0, None, None
 
     maior, atual = 1, 1
+    inicio_atual = datas_unicas[0]
+    inicio_maior, fim_maior = datas_unicas[0], datas_unicas[0]
 
     for indice in range(1, len(datas_unicas)):
         diferenca = (
             pd.Timestamp(datas_unicas[indice]) - pd.Timestamp(datas_unicas[indice - 1])
         ).days
 
-        atual = atual + 1 if diferenca == 1 else 1
-        maior = max(maior, atual)
+        if diferenca == 1:
+            atual += 1
+        else:
+            atual = 1
+            inicio_atual = datas_unicas[indice]
 
-    return maior
+        if atual > maior:
+            maior = atual
+            inicio_maior, fim_maior = inicio_atual, datas_unicas[indice]
+
+    return maior, pd.Timestamp(inicio_maior), pd.Timestamp(fim_maior)
 
 
 def enriquecer(df: pd.DataFrame) -> pd.DataFrame:
@@ -151,17 +166,58 @@ def enriquecer(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def maior_sequencia_do_grupo(df: pd.DataFrame) -> int:
-    return _maior_sequencia_consecutiva(df["data_calendario"])
+    tamanho, _inicio, _fim = maior_sequencia_consecutiva(df["data_calendario"])
+    return tamanho
+
+
+def maior_sequencia_do_grupo_com_periodo(df: pd.DataFrame) -> tuple:
+    """Tamanho e período (início, fim) da maior sequência de dias consecutivos do grupo."""
+
+    return maior_sequencia_consecutiva(df["data_calendario"])
 
 
 def maior_sequencia_por_pessoa(df: pd.DataFrame) -> pd.DataFrame:
-    return (
-        df.groupby("nome", observed=True)["data_calendario"]
-        .apply(_maior_sequencia_consecutiva)
-        .reset_index(name="maximo_dias_consecutivos")
-        .sort_values("maximo_dias_consecutivos", ascending=False)
-        .reset_index(drop=True)
-    )
+    """Maior sequência de dias consecutivos, por pessoa, com o período (início/fim) em que ela ocorreu."""
+
+    resultado = df.groupby("nome", observed=True)["data_calendario"].apply(maior_sequencia_consecutiva)
+
+    tabela = pd.DataFrame(
+        resultado.tolist(),
+        columns=["maximo_dias_consecutivos", "sequencia_inicio", "sequencia_fim"],
+        index=resultado.index,
+    ).reset_index()
+
+    return tabela.sort_values("maximo_dias_consecutivos", ascending=False).reset_index(drop=True)
+
+
+def sequencia_atual_por_pessoa(df: pd.DataFrame) -> pd.DataFrame:
+    """Sequência de dias consecutivos "em andamento" por pessoa: quantos dias
+    seguidos, terminando no último dia do período analisado, a pessoa mandou
+    mensagem. Se o último dia dela não coincidir com o último dia do
+    período, a sequência já foi quebrada (conta 0).
+    """
+
+    ultimo_dia_periodo = df["data_calendario"].max()
+
+    registros = []
+    for pessoa, grupo in df.groupby("nome", observed=True):
+        dias = sorted(grupo["data_calendario"].dropna().unique())
+
+        if not dias or pd.Timestamp(dias[-1]) != ultimo_dia_periodo:
+            registros.append({"nome": pessoa, "sequencia_atual": 0})
+            continue
+
+        atual = 1
+        for indice in range(len(dias) - 1, 0, -1):
+            diferenca = (pd.Timestamp(dias[indice]) - pd.Timestamp(dias[indice - 1])).days
+            if diferenca == 1:
+                atual += 1
+            else:
+                break
+
+        registros.append({"nome": pessoa, "sequencia_atual": atual})
+
+    return pd.DataFrame(registros, columns=["nome", "sequencia_atual"])
 
 
 def resumo_por_conversa(df: pd.DataFrame) -> pd.DataFrame:

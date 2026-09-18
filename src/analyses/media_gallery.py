@@ -7,25 +7,19 @@ quase nunca se repetem, então o ranking usa figurinhas, não fotos.
 
 from __future__ import annotations
 
-import tempfile
 import textwrap
 from io import BytesIO
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image as PILImage
 
+from ..audio import medir_duracoes_audio
 from ..chart_common import grafico_barras_por_pessoa
 from ..colors import BRAND
 from ..models import AnalysisResult, ChartArtifact
 from ..style import rodape_assinatura
 from ..utils import formatar_duracao, formatar_numero
-
-try:
-    from mutagen import File as MutagenFile
-except ImportError:  # pragma: no cover - mutagen está no requirements.txt
-    MutagenFile = None
 
 KEY = "midia_detalhada"
 TITLE = "Figurinhas e áudios"
@@ -33,44 +27,6 @@ ICON = "figurinha"
 REQUIRES_MEDIA = True
 
 QUANTIDADE_TOP_FIGURINHAS = 5
-
-
-def _duracao_audio(caminho: Path):
-    if MutagenFile is None:
-        return None
-
-    try:
-        audio = MutagenFile(str(caminho))
-        if audio is None or not hasattr(audio, "info"):
-            return None
-        return float(getattr(audio.info, "length", None) or 0) or None
-    except Exception:
-        return None
-
-
-def _medir_duracoes_audio(df: pd.DataFrame, media_store) -> pd.DataFrame:
-    audios = df.loc[df["arquivo_audio"]].copy()
-
-    if audios.empty:
-        return audios
-
-    duracoes = {}
-    with tempfile.TemporaryDirectory() as pasta:
-        pasta = Path(pasta)
-        for indice, nome_arquivo in enumerate(audios["nome_arquivo_anexo"].dropna().unique(), start=1):
-            conteudo = media_store.read(nome_arquivo)
-            if conteudo is None:
-                continue
-            extensao = Path(nome_arquivo).suffix or ".opus"
-            caminho_temporario = pasta / f"audio_{indice:05d}{extensao}"
-            caminho_temporario.write_bytes(conteudo)
-            duracoes[nome_arquivo.casefold()] = _duracao_audio(caminho_temporario)
-
-    audios["duracao_audio_segundos"] = (
-        audios["nome_arquivo_anexo"].str.casefold().map(duracoes)
-    )
-
-    return audios
 
 
 def _top_figurinhas_por_pessoa(df: pd.DataFrame, media_store, limite: int):
@@ -141,7 +97,7 @@ def _grafico_galeria(tabela: pd.DataFrame, miniaturas: dict, limite: int):
             except Exception:
                 eixo.text(0.5, 0.5, "Indisponível", ha="center", va="center", transform=eixo.transAxes)
 
-            eixo.set_title(f"{int(registro['posicao'])}º · {int(registro['quantidade_envios'])}x", fontsize=10.5, fontweight="bold")
+            eixo.set_title(f"{int(registro['posicao'])}º · {int(registro['quantidade_envios'])}x", fontsize=15, fontweight="bold")
 
         eixos[linha, 0].text(
             -0.25, 0.5, textwrap.fill(str(nome), width=16), transform=eixos[linha, 0].transAxes,
@@ -159,7 +115,7 @@ def run(ctx) -> AnalysisResult:
     charts = []
     insights = []
 
-    audios = _medir_duracoes_audio(ctx.df, ctx.media_store)
+    audios = medir_duracoes_audio(ctx.df, ctx.media_store)
 
     if not audios.empty:
         audios["duracao_audio_formatada"] = audios["duracao_audio_segundos"].apply(formatar_duracao)
@@ -168,6 +124,7 @@ def run(ctx) -> AnalysisResult:
             audios.groupby("nome", observed=True)
             .agg(
                 quantidade_audios=("arquivo_audio", "size"),
+                quantidade_audios_com_duracao=("duracao_audio_segundos", "count"),
                 tempo_total_segundos=("duracao_audio_segundos", "sum"),
             )
             .reindex(ctx.people, fill_value=0)
@@ -175,7 +132,9 @@ def run(ctx) -> AnalysisResult:
         )
         resumo_audio["tempo_total_minutos"] = (resumo_audio["tempo_total_segundos"] / 60).round(2)
         resumo_audio["tempo_total_formatado"] = resumo_audio["tempo_total_segundos"].apply(formatar_duracao)
-        divisor = resumo_audio["quantidade_audios"].astype(float).replace(0.0, float("nan"))
+        # A média usa só os áudios com duração conhecida — dividir pelo total de
+        # áudios (incluindo os que falharam na leitura) subestimaria a média.
+        divisor = resumo_audio["quantidade_audios_com_duracao"].astype(float).replace(0.0, float("nan"))
         resumo_audio["duracao_media_segundos"] = resumo_audio["tempo_total_segundos"] / divisor
         resumo_audio["duracao_media_formatada"] = resumo_audio["duracao_media_segundos"].apply(formatar_duracao)
         resumo_audio = resumo_audio.sort_values("tempo_total_segundos", ascending=False).reset_index(drop=True)
@@ -228,6 +187,15 @@ def run(ctx) -> AnalysisResult:
             insights.append(
                 f"{campeao_duracao_media['nome']} manda os áudios mais longos em média: "
                 f"{campeao_duracao_media['duracao_media_formatada']} por áudio."
+            )
+
+        total_audios = len(audios)
+        total_sem_duracao = int(audios["duracao_audio_segundos"].isna().sum())
+        if total_sem_duracao:
+            insights.append(
+                f"{formatar_numero(total_sem_duracao)} de {formatar_numero(total_audios)} áudios não "
+                "puderam ter a duração medida (arquivo corrompido ou formato não reconhecido); "
+                "eles entram na contagem de áudios, mas não nos tempos e médias acima."
             )
 
     top_figurinhas, miniaturas = _top_figurinhas_por_pessoa(ctx.df, ctx.media_store, QUANTIDADE_TOP_FIGURINHAS)
