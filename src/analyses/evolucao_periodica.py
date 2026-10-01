@@ -6,16 +6,12 @@ alguém está interagindo mais ou menos, e como isso varia com o tempo.
 
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from ..audio import medir_duracoes_audio
 from ..chart_common import grafico_barras_por_pessoa, grafico_barras_simples, grafico_linhas_por_categoria
-from ..colors import BRAND
-from ..enrich import maior_sequencia_consecutiva
 from ..models import AnalysisResult, ChartArtifact
-from ..style import FIGSIZE_LARGO, FIGSIZE_PADRAO, estilizar_eixo, rodape_assinatura
-from ..utils import formatar_numero, truncar
+from ..utils import formatar_numero
 
 KEY = "evolucao_periodica"
 TITLE = "Evolução por período"
@@ -66,58 +62,6 @@ def _preparar_periodos(df: pd.DataFrame, granularidade: str) -> tuple[pd.DataFra
     return df, ordem, dias_possiveis
 
 
-def _grafico_sequencia_por_periodo(sequencias: dict, dias_possiveis: dict, ordem_periodos: list, people: list, color_map: dict, titulo: str, rotulo_x: str):
-    """Barras agrupadas: maior sequência de dias consecutivos por pessoa,
-    dentro de cada período. O rótulo de cada barra mostra "dias/possíveis" —
-    o denominador varia por período (calendário do mês/semana), não por pessoa.
-    """
-
-    n_pessoas = max(len(people), 1)
-    largura_barra = 0.8 / n_pessoas
-    posicoes_x = list(range(len(ordem_periodos)))
-
-    largura_fig = max(FIGSIZE_LARGO[0], 1.1 * len(ordem_periodos) + 3)
-    altura_fig = FIGSIZE_PADRAO[1]
-    if largura_fig / altura_fig > 2.4:
-        altura_fig = largura_fig / 2.4
-    fig, ax = plt.subplots(figsize=(largura_fig, altura_fig))
-
-    for indice, pessoa in enumerate(people):
-        valores = [sequencias.get((periodo, pessoa), 0) for periodo in ordem_periodos]
-        deslocamento = (indice - (n_pessoas - 1) / 2) * largura_barra
-        posicoes = [x + deslocamento for x in posicoes_x]
-
-        barras = ax.bar(
-            posicoes, valores, width=largura_barra * 0.9,
-            color=color_map.get(pessoa, BRAND["primary"]), label=pessoa, zorder=3,
-        )
-
-        for barra, periodo in zip(barras, ordem_periodos):
-            altura = barra.get_height()
-            ax.annotate(
-                f"{int(altura)}/{dias_possiveis[periodo]}",
-                xy=(barra.get_x() + barra.get_width() / 2, altura),
-                xytext=(0, 3), textcoords="offset points",
-                ha="center", va="bottom", fontsize=7.5, fontweight="bold", color=BRAND["ink"],
-            )
-
-    ax.set_title(titulo)
-    ax.set_xlabel(rotulo_x)
-    ax.set_ylabel("Dias consecutivos")
-    ax.set_xticks(posicoes_x)
-    ax.set_xticklabels(ordem_periodos)
-    valor_maximo = max((v for v in sequencias.values()), default=0)
-    ax.set_ylim(0, max(valor_maximo * 1.3, 1))
-    estilizar_eixo(ax)
-    plt.setp(ax.get_xticklabels(), rotation=20 if len(ordem_periodos) <= 14 else 45, ha="right")
-    ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), borderaxespad=0)
-
-    fig.tight_layout()
-    rodape_assinatura(fig)
-
-    return fig
-
-
 def run(ctx) -> AnalysisResult:
     df = ctx.df
 
@@ -130,7 +74,7 @@ def run(ctx) -> AnalysisResult:
         ctx.periodo_modo == "mes_ano" or (ctx.periodo_modo == "periodo" and span_dias <= 31)
     ) else "mes"
 
-    df, ordem_periodos, dias_possiveis = _preparar_periodos(df, granularidade)
+    df, ordem_periodos, _dias_possiveis = _preparar_periodos(df, granularidade)
 
     if len(ordem_periodos) < 2:
         return AnalysisResult(key=KEY, title=TITLE, icon=ICON)
@@ -225,42 +169,6 @@ def run(ctx) -> AnalysisResult:
             f"para {formatar_numero(comparativo.loc[quem_mais_caiu, ultimo_periodo])}."
         )
 
-    # 2b) maior sequência de dias consecutivos dentro de cada período, por pessoa
-    sequencia_periodo = (
-        df.groupby(["periodo_rotulo", "nome"], observed=True)["data_calendario"]
-        .apply(lambda serie: maior_sequencia_consecutiva(serie)[0])
-        .reset_index(name="maximo_dias_consecutivos")
-    )
-    sequencia_periodo = grade.merge(sequencia_periodo, on=["periodo_rotulo", "nome"], how="left")
-    sequencia_periodo["maximo_dias_consecutivos"] = sequencia_periodo["maximo_dias_consecutivos"].fillna(0).astype(int)
-    sequencia_periodo["dias_possiveis"] = sequencia_periodo["periodo_rotulo"].map(dias_possiveis)
-
-    sequencias_dict = {
-        (linha.periodo_rotulo, linha.nome): linha.maximo_dias_consecutivos
-        for linha in sequencia_periodo.itertuples()
-    }
-
-    charts.append(
-        ChartArtifact(
-            slug="26bb_sequencia_dias_por_periodo",
-            title=f"Maior sequência de dias consecutivos, por pessoa e por {unidade}",
-            figure=_grafico_sequencia_por_periodo(
-                sequencias_dict, dias_possiveis, ordem_periodos, ctx.people, ctx.color_map,
-                f"Maior sequência de dias seguidos, {titulo_secao.lower()}", rotulo_eixo,
-            ),
-        )
-    )
-    tabelas["sequencia_dias_por_periodo"] = sequencia_periodo
-
-    melhor_sequencia_periodo = sequencia_periodo.loc[sequencia_periodo["maximo_dias_consecutivos"].idxmax()]
-    if melhor_sequencia_periodo["maximo_dias_consecutivos"] > 0:
-        insights.append(
-            f"Melhor sequência dentro de um(a) só {unidade}: {melhor_sequencia_periodo['nome']}, com "
-            f"{formatar_numero(melhor_sequencia_periodo['maximo_dias_consecutivos'])}/"
-            f"{formatar_numero(melhor_sequencia_periodo['dias_possiveis'])} dias, em "
-            f"{melhor_sequencia_periodo['periodo_rotulo']}."
-        )
-
     # 3) figurinhas por pessoa e total, por período (não depende de mídia real)
     figurinhas = (
         df.loc[df["figurinha"]]
@@ -353,6 +261,139 @@ def run(ctx) -> AnalysisResult:
                 )
                 tabelas["duracao_audio_total_periodo"] = audio_total_periodo
 
+    intro_historico = ""
+
+    # 5) evolução mês a mês considerando TODO o período dos dados — só faz
+    # sentido no relatório mensal (que, até aqui, só olhou o mês escolhido):
+    # dá pra comparar esse mês com o histórico inteiro do arquivo.
+    if ctx.periodo_modo == "mes_ano" and ctx.df_historico_completo is not None:
+        df_hist = ctx.df_historico_completo
+        span_dias_hist = (df_hist["data_calendario"].max() - df_hist["data_calendario"].min()).days + 1
+
+        if span_dias_hist >= 2:
+            df_hist, ordem_meses, _dias_possiveis_meses = _preparar_periodos(df_hist, "mes")
+
+            if len(ordem_meses) >= 2:
+                intro_historico = (
+                    " Também mostra a evolução mês a mês de mensagens, caracteres, figurinhas e áudio "
+                    "por pessoa, considerando todo o período disponível nos dados (não só o mês escolhido)."
+                )
+
+                grade_meses = pd.MultiIndex.from_product(
+                    [ordem_meses, ctx.people], names=["periodo_rotulo", "nome"]
+                ).to_frame(index=False)
+
+                # mensagens por pessoa, mês a mês, no histórico inteiro
+                mensagens_hist = (
+                    df_hist.groupby(["periodo_rotulo", "nome"], observed=True)
+                    .size()
+                    .reset_index(name="quantidade_mensagens")
+                )
+                mensagens_hist = grade_meses.merge(mensagens_hist, on=["periodo_rotulo", "nome"], how="left")
+                mensagens_hist["quantidade_mensagens"] = mensagens_hist["quantidade_mensagens"].fillna(0).astype(int)
+
+                charts.append(
+                    ChartArtifact(
+                        slug="26g_mensagens_por_pessoa_mes_historico",
+                        title="Mensagens por pessoa, mês a mês (período total)",
+                        figure=grafico_linhas_por_categoria(
+                            mensagens_hist, "periodo_rotulo", "quantidade_mensagens", "nome",
+                            "Mensagens por pessoa, mês a mês, considerando todo o período dos dados",
+                            "Mês", "Quantidade de mensagens", ctx.color_map,
+                            ordem_x=ordem_meses,
+                        ),
+                    )
+                )
+                tabelas["mensagens_por_pessoa_mes_historico"] = mensagens_hist
+
+                # caracteres por pessoa, mês a mês, no histórico inteiro
+                caracteres_hist = (
+                    df_hist.groupby(["periodo_rotulo", "nome"], observed=True)["quantidade_caracteres"]
+                    .sum()
+                    .reset_index(name="quantidade_caracteres")
+                )
+                caracteres_hist = grade_meses.merge(caracteres_hist, on=["periodo_rotulo", "nome"], how="left")
+                caracteres_hist["quantidade_caracteres"] = (
+                    caracteres_hist["quantidade_caracteres"].fillna(0).astype(int)
+                )
+
+                charts.append(
+                    ChartArtifact(
+                        slug="26h_caracteres_por_pessoa_mes_historico",
+                        title="Caracteres por pessoa, mês a mês (período total)",
+                        figure=grafico_linhas_por_categoria(
+                            caracteres_hist, "periodo_rotulo", "quantidade_caracteres", "nome",
+                            "Volume de texto por pessoa, mês a mês, considerando todo o período dos dados",
+                            "Mês", "Quantidade de caracteres", ctx.color_map,
+                            ordem_x=ordem_meses,
+                        ),
+                    )
+                )
+                tabelas["caracteres_por_pessoa_mes_historico"] = caracteres_hist
+
+                # figurinhas por pessoa, mês a mês, no histórico inteiro
+                figurinhas_hist = (
+                    df_hist.loc[df_hist["figurinha"]]
+                    .groupby(["periodo_rotulo", "nome"], observed=True)
+                    .size()
+                    .reset_index(name="quantidade_figurinhas")
+                )
+                figurinhas_hist = grade_meses.merge(figurinhas_hist, on=["periodo_rotulo", "nome"], how="left")
+                figurinhas_hist["quantidade_figurinhas"] = (
+                    figurinhas_hist["quantidade_figurinhas"].fillna(0).astype(int)
+                )
+
+                if figurinhas_hist["quantidade_figurinhas"].sum() > 0:
+                    charts.append(
+                        ChartArtifact(
+                            slug="26i_figurinhas_por_pessoa_mes_historico",
+                            title="Figurinhas por pessoa, mês a mês (período total)",
+                            figure=grafico_linhas_por_categoria(
+                                figurinhas_hist, "periodo_rotulo", "quantidade_figurinhas", "nome",
+                                "Figurinhas por pessoa, mês a mês, considerando todo o período dos dados",
+                                "Mês", "Quantidade de figurinhas", ctx.color_map,
+                                ordem_x=ordem_meses,
+                            ),
+                        )
+                    )
+                    tabelas["figurinhas_por_pessoa_mes_historico"] = figurinhas_hist
+
+                # duração de áudio por pessoa, mês a mês, no histórico inteiro
+                if ctx.has_media:
+                    audios_hist = medir_duracoes_audio(df_hist, ctx.media_store)
+
+                    if not audios_hist.empty:
+                        audio_por_pessoa_hist = (
+                            audios_hist.groupby(["periodo_rotulo", "nome"], observed=True)["duracao_audio_segundos"]
+                            .sum()
+                            .reset_index(name="duracao_audio_segundos")
+                        )
+                        audio_por_pessoa_hist = grade_meses.merge(
+                            audio_por_pessoa_hist, on=["periodo_rotulo", "nome"], how="left"
+                        )
+                        audio_por_pessoa_hist["duracao_audio_segundos"] = (
+                            audio_por_pessoa_hist["duracao_audio_segundos"].fillna(0.0)
+                        )
+                        audio_por_pessoa_hist["duracao_audio_minutos"] = (
+                            audio_por_pessoa_hist["duracao_audio_segundos"] / 60
+                        ).round(2)
+
+                        if audio_por_pessoa_hist["duracao_audio_minutos"].sum() > 0:
+                            charts.append(
+                                ChartArtifact(
+                                    slug="26j_audio_por_pessoa_mes_historico",
+                                    title="Duração de áudio por pessoa, mês a mês (período total)",
+                                    figure=grafico_linhas_por_categoria(
+                                        audio_por_pessoa_hist, "periodo_rotulo", "duracao_audio_minutos", "nome",
+                                        "Duração de áudio por pessoa, mês a mês, considerando todo o "
+                                        "período dos dados",
+                                        "Mês", "Minutos de áudio", ctx.color_map,
+                                        ordem_x=ordem_meses,
+                                    ),
+                                )
+                            )
+                            tabelas["audio_por_pessoa_mes_historico"] = audio_por_pessoa_hist
+
     return AnalysisResult(
         key=KEY,
         title=titulo_secao,
@@ -363,5 +404,6 @@ def run(ctx) -> AnalysisResult:
         intro=(
             f"Como a atividade do grupo muda {('mês a mês' if granularidade == 'mes' else 'semana a semana')} "
             "— para ver quem está interagindo mais ou menos, e quando isso muda."
+            f"{intro_historico}"
         ),
     )

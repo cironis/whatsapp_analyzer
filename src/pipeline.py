@@ -136,6 +136,12 @@ def executar_analise(
     df = dados.df_bruto.copy()
     df["nome"] = df["nome"].replace(mapa_nomes or {})
 
+    modo_periodo = (filtro_periodo or {"modo": "geral"}).get("modo", "geral")
+    # Só no modo "mes_ano" vale a pena carregar o histórico inteiro de novo:
+    # é o que permite comparar o mês escolhido com a evolução mês a mês de
+    # todo o período, mesmo com o relatório recortado num único mês.
+    df_historico_completo = enrich.enriquecer(df) if modo_periodo == "mes_ano" else None
+
     df, janela_inicio, janela_fim, titulo_janela, recorte_periodo = _filtrar_por_periodo(df, filtro_periodo)
 
     if df.empty:
@@ -153,10 +159,11 @@ def executar_analise(
         has_media=dados.media_store.has_media,
         media_store=dados.media_store,
         group_label=rotulo_grupo,
-        periodo_modo=(filtro_periodo or {"modo": "geral"}).get("modo", "geral"),
+        periodo_modo=modo_periodo,
         janela_recente_inicio=janela_inicio,
         janela_recente_fim=janela_fim,
         janela_recente_titulo=titulo_janela,
+        df_historico_completo=df_historico_completo,
     )
 
     resultados = []

@@ -56,6 +56,12 @@ class AnalysisContext:
     janela_recente_inicio: Optional[Timestamp] = None
     janela_recente_fim: Optional[Timestamp] = None
     janela_recente_titulo: Optional[str] = None
+    # Só preenchido no modo "mes_ano": o DataFrame enriquecido com TODO o
+    # histórico do arquivo (sem o filtro do mês escolhido), usado por
+    # `analyses/evolucao_periodica.py` para mostrar a evolução mês a mês ao
+    # longo de todo o período, mesmo quando o relatório está recortado num
+    # único mês.
+    df_historico_completo: Optional[pd.DataFrame] = None
 
 
 @dataclass
